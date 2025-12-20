@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rahmani pair site</title>
+  <title>Tech Expert pair site</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
   <style>
     body {
@@ -12,7 +12,7 @@
       align-items: center;
       height: 100vh;
       margin: 0;
-      background:  url("https://files.catbox.moe/aktbgo.jpg"); /* set the background image */
+      background:  url("https://files.catbox.moe/s3wv2g.jpg"); /* set the background image */
       font-family: Arial, sans-serif;
     }
 
@@ -142,12 +142,12 @@
         <div id="text">
           <i class="fa fa-user"></i>
           <p>
-            <h3 class="centered-text"> RAHMANI-XMD SESSION SCANNER</h3>
+            <h3 class="centered-text"> EXPERT-MD SESSION PAIR</h3>
             <br>
-            <h6>Coded by RAHMANI XMD .</h6>
+            <h6>Coded by Tech Expert Md .</h6>
             <h6>Enter Your Number with Country Code.</h6>
             <div class="input-container">
-              <input placeholder="255693xxxx" type="number" id="number" placeholder="Enter your Phone Pumber with Cuntry Code" name="">
+              <input placeholder="25575259xxxx" type="number" id="number" placeholder="Enter your Phone Pumber with Cuntry Code" name="">
               <button id="submit">Submit</button>
             </div>
             
@@ -188,10 +188,10 @@
       } else if (c.value.replace(/[^0-9]/g, "").length < 11) {
         a.innerHTML = '<a style="color:red;font-weight:bold">Invalid Phone Number</a><br><br>';
       } else {
-        const France_King = c.value.replace(/[^0-9]/g, "");
+        const fredi = c.value.replace(/[^0-9]/g, "");
         let bb = "";
         let bbc = "";
-        const cc = France_King.split('');
+        const cc = fredi.split('');
         cc.map(a => {
           bbc += a;
           if (bbc.length == 3) {
@@ -206,7 +206,7 @@
         c.value = "+" + bb;
         c.style = "color:red;font-size:20px";
         a.innerHTML = '<a style="color:white;font-weight:bold">Please Wait...</a><br><br>';
-        let { data } = await axios(`/code?number=${France_King}`);
+        let { data } = await axios(`/code?number=${fredi}`);
         let code = data.code || "Service Unavailable";
         a.innerHTML = '<font id="copy" onclick="Copy()" style="color:red;font-weight:bold" size="5">CODE: <span style="color:white;font-weight:bold">' + code + '</span></font><br><br><br>';
       }
