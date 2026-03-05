@@ -1,62 +1,156 @@
-const PastebinAPI = require('pastebin-js'),
-pastebin = new PastebinAPI('EMWTMkQAVfJa9kM-MRUrxd5Oku1U7pgL')
-const {makeid} = require('./id');
 const express = require('express');
 const fs = require('fs');
-let router = express.Router()
-const pino = require("pino");
+const path = require('path');
+const pino = require('pino');
+const { makeid } = require('./id');
+
 const {
-    default: fredi,
+    default: Fredi,
     useMultiFileAuthState,
     delay,
     makeCacheableSignalKeyStore,
-    Browsers
-} = require("@whiskeysockets/baileys");
+    Browsers,
+    fetchLatestBaileysVersion,
+} = require('@whiskeysockets/baileys');
 
-function removeFile(FilePath){
-    if(!fs.existsSync(FilePath)) return false;
-    fs.rmSync(FilePath, { recursive: true, force: true })
- };
+const router = express.Router();
+const sessionDir = path.join(__dirname, "temp");
+
+function removeFile(path) {
+    if (fs.existsSync(path)) fs.rmSync(path, { recursive: true, force: true });
+}
+
 router.get('/', async (req, res) => {
     const id = makeid();
-    let num = req.query.number;
-        async function FEE_XMD_PAIR() {
-        const {
-            state,
-            saveCreds
-        } = await useMultiFileAuthState('./temp/'+id)
-     try {
-            let Pair_Code_By_fredi = fredi({
+    const num = (req.query.number || '').replace(/[^0-9]/g, '');
+    const tempDir = path.join(sessionDir, id);
+    let responseSent = false;
+    let sessionCleanedUp = false;
+
+    async function cleanUpSession() {
+        if (!sessionCleanedUp) {
+            try {
+                removeFile(tempDir);
+            } catch (cleanupError) {
+                console.error("Cleanup error:", cleanupError);
+            }
+            sessionCleanedUp = true;
+        }
+    }
+
+    async function startPairing() {
+        try {
+            const { version } = await fetchLatestBaileysVersion();
+            const { state, saveCreds } = await useMultiFileAuthState(tempDir);
+
+            const sock = Fredi({
+                version,
+                logger: pino({ level: 'fatal' }).child({ level: 'fatal' }),
+                printQRInTerminal: false,
                 auth: {
                     creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, pino({level: "fatal"}).child({level: "fatal"})),
+                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' }).child({ level: 'fatal' })),
                 },
-                printQRInTerminal: false,
-                logger: pino({ level: "fatal" }).child({ level: "fatal" }),
-                browser: Browsers.macOS('Chrome')
-             });
-             if(!Pair_Code_By_fredi.authState.creds.registered) {
-                await delay(1500);
-                        num = num.replace(/[^0-9]/g,'');
-                            const code = await Pair_Code_By_fredi.requestPairingCode(num)
-                 if(!res.headersSent){
-                 await res.send({code});
-                     }
-                 }
-            Pair_Code_By_fredi.ev.on('creds.update', saveCreds)
-            Pair_Code_By_fredi.ev.on("connection.update", async (s) => {
-                const {
-                    connection,
-                    lastDisconnect
-                } = s;
-                if (connection == "open") {
-                await delay(50000);
-                let data = fs.readFileSync(__dirname + `/temp/${id}/creds.json`);
-                await delay(8000);
-               let b64data = Buffer.from(data).toString('base64');
-               let session = await Pair_Code_By_fredi.sendMessage(Pair_Code_By_fredi.user.id, { text: 'EXPERT-MD%>'+ b64data });
+                browser: ["Ubuntu", "Chrome", "125"],
+                syncFullHistory: false,
+                generateHighQualityLinkPreview: true,
+                shouldIgnoreJid: jid => !!jid?.endsWith('@g.us'),
+                getMessage: async () => undefined,
+                markOnlineOnConnect: true,
+                connectTimeoutMs: 120000,
+                keepAliveIntervalMs: 30000,
+                emitOwnEvents: true,
+                fireInitQueries: true,
+                defaultQueryTimeoutMs: 60000,
+                transactionOpts: {
+                    maxCommitRetries: 10,
+                    delayBetweenTriesMs: 3000
+                },
+                retryRequestDelayMs: 10000
+            });
 
-               let FEE_XMD_TEXT = `
+            // === Pairing Code Generation ===  
+            if (!sock.authState.creds.registered) {
+                await delay(2000); 
+                const code = await sock.requestPairingCode(num);
+                if (!responseSent && !res.headersSent) {
+                    res.json({ code: code });
+                    responseSent = true;
+                }
+            }
+
+            sock.ev.on('creds.update', saveCreds);
+
+            sock.ev.on('connection.update', async (update) => {
+                const { connection, lastDisconnect } = update;
+
+                if (connection === 'open') {
+                    console.log('✅ Fee-Xmd successfully connected to WhatsApp.');
+
+
+
+                    try {
+                        await sock.sendMessage(sock.user.id, {
+                            text: `
+
+╭┈┈┈┈━━━━━━┈┈┈┈◈◈
+┋❒ Hello! 👋 You're Connecting
+
+┋❒ Please wait a moment while we generate your session ID. It will be sent shortly... 🙂
+╰┈┈┈┈━━━━━━┈┈┈┈◈
+`,
+                        });
+                    } catch (msgError) {
+                        console.log("Welcome message skipped, continuing...");
+                    }
+
+                    await delay(15000);
+
+                    const credsPath = path.join(tempDir, "creds.json");
+
+
+                    let sessionData = null;
+                    let attempts = 0;
+                    const maxAttempts = 10;
+
+                    while (attempts < maxAttempts && !sessionData) {
+                        try {
+                            if (fs.existsSync(credsPath)) {
+                                const data = fs.readFileSync(credsPath);
+                                if (data && data.length > 50) {
+                                    sessionData = data;
+                                    break;
+                                }
+                            }
+                            await delay(4000);
+                            attempts++;
+                        } catch (readError) {
+                            console.error("Read attempt error:", readError);
+                            await delay(2000);
+                            attempts++;
+                        }
+                    }
+
+                    if (!sessionData) {
+                        console.error("Failed to read session data");
+                        try {
+                            await sock.sendMessage(sock.user.id, {
+                                text: "Failed to generate session. Please try again."
+                            });
+                        } catch (e) {}
+                        await cleanUpSession();
+                        sock.ws.close();
+                        return;
+                    }
+
+                    const base64 = Buffer.from(sessionData).toString('base64');
+
+                    try {
+                        const sentSession = await sock.sendMessage(sock.user.id, {
+                            text: base64
+                        });
+
+                        const infoMessage = `  
 *═════════════════════*
 *_TECH EXPERT MD device connected_*
 ______________________________________
@@ -65,34 +159,78 @@ ______________________________________
 ║ _You Have Completed the First Step to Deploy a Whatsapp Bot._
 ╚════════════════════════╝
 ╔═════◇
-║  『••• 𝗩𝗶𝘀𝗶𝘁 𝗙𝗼𝗿 𝗛𝗲𝗹𝗽 •••』
+║  『••• 𝗩𝗶𝘀𝗶𝘁 𝗙𝗼𝗿 𝗛𝗲𝗹𝗽 •••』
 ║❒ *Owner:* _https://wa.me/message/J3VJYDUH6ZGYI1_
 ║❒ *Repo:* _https://github.com/MESHACK41/TECH-EXPERT-MD_
 ║❒ *WaChannel:* _https://whatsapp.com/channel/0029VbA1jdkDp2QAvGIIrL0m_
 ║❒ 
 ╚════════════════════════╝
 _____________________________________
-> regards fee tech`
+> regards fee tech
+`;
 
- await Pair_Code_By_fredi.sendMessage(Pair_Code_By_fredi.user.id,{text:FEE_XMD_TEXT},{quoted:session})
- 
+                        await sock.sendMessage(sock.user.id, { text: infoMessage }, { quoted: sentSession });
 
-        await delay(100);
-        await Pair_Code_By_fredi.ws.close();
-        return await removeFile('./temp/'+id);
-            } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode != 401) {
-                    await delay(10000);
-                    FEE_XMD_PAIR();
+                        await delay(2000);
+                        sock.ws.close();
+                        await cleanUpSession();
+
+                    } catch (sendError) {
+                        console.error("Error sending session:", sendError);
+                        await cleanUpSession();
+                        sock.ws.close();
+                    }
+
+                } else if (connection === "close") {
+                    if (lastDisconnect?.error?.output?.statusCode !== 401) {
+                        console.log('⚠️ Connection closed, attempting to reconnect...');
+                        await delay(10000);
+                        startPairing();
+                    } else {
+                        console.log('❌ Connection closed permanently');
+                        await cleanUpSession();
+                    }
+                } else if (connection === "connecting") {
+                    console.log('⏳ Connecting to WhatsApp...');
                 }
             });
+
+            // Handle errors
+            sock.ev.on('connection.update', (update) => {
+                if (update.qr) {
+                    console.log("QR code received");
+                }
+                if (update.connection === "close") {
+                    console.log("Connection closed event");
+                }
+            });
+
         } catch (err) {
-            console.log("service restated");
-            await removeFile('./temp/'+id);
-         if(!res.headersSent){
-            await res.send({code:"Service is Currently Unavailable"});
-         }
+            console.error('❌ Error during pairing:', err);
+            await cleanUpSession();
+            if (!responseSent && !res.headersSent) {
+                res.status(500).json({ code: 'Service Unavailable. Please try again.' });
+                responseSent = true;
+            }
         }
     }
-    return await FEE_XMD_PAIR()
+
+
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+            reject(new Error("Pairing process timeout"));
+        }, 180000);
+    });
+
+    try {
+        await Promise.race([startPairing(), timeoutPromise]);
+    } catch (finalError) {
+        console.error("Final error:", finalError);
+        await cleanUpSession();
+        if (!responseSent && !res.headersSent) {
+            res.status(500).json({ code: "Service Error - Timeout" });
+        }
+    }
 });
-module.exports = router
+
+module.exports = router;
